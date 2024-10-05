@@ -5,9 +5,9 @@ from openai import OpenAI
 
 app = FastAPI()
 
-Key = ''
+Key = 'user_key'
 client = OpenAI(api_key=Key)
-assistant_id = ""
+assistant_id = "assistant_key"
 
 class Item(BaseModel):
     region: str = ""
@@ -18,6 +18,9 @@ class Question(BaseModel):
     mission: str
     question: str
     thread_id: str
+
+class Thema(BaseModel):
+    thema: str
     
 @app.post("/get_mission/")
 async def create_item(data: Item):
@@ -107,7 +110,7 @@ async def create_item(data: Item):
     
     run = client.beta.threads.runs.create_and_poll(
     thread_id=thread.id,
-    assistant_id=""
+    assistant_id="assistant_key"
     )
     if run.status == 'completed': 
         messages = client.beta.threads.messages.list(
@@ -131,3 +134,72 @@ async def create_item(data: Item):
     else:
         return run.status
     
+    
+@app.post("/judge/")
+async def create_item(data: Item):
+    region = data.region
+    
+    # print(data.region, data.mbti, data.num_people)
+    mbti_seq = ""
+    for m,n in zip(data.mbti, data.num_people):
+        mbti_seq += (m+str(n)+' ')
+    thread = client.beta.threads.create()
+    message = client.beta.threads.messages.create(
+    thread_id=thread.id,
+    role="user",
+    content=f"{region} {mbti_seq}"
+    )
+    
+    run = client.beta.threads.runs.create_and_poll(
+    thread_id=thread.id,
+    assistant_id=assistant_id
+    )
+    if run.status == 'completed': 
+        messages = client.beta.threads.messages.list(
+            thread_id=thread.id
+        )
+        res = []
+        for i in messages.data[0].content[0].text.value.split("\n"):
+            if i: 
+                if i[0] in '12345':
+                    res.append(i)
+        return res, thread.id
+                
+    else:
+        return run.status
+    
+    
+@app.post("/get_thema/")
+async def create_item(data: Thema):
+    thread = client.beta.threads.create()
+    message = client.beta.threads.messages.create(
+    thread_id=thread.id,
+    role="user",
+    content=f"{data.thema}를 주로 여행하고싶어"
+    )
+    
+    run = client.beta.threads.runs.create_and_poll(
+    thread_id=thread.id,
+    assistant_id="assistant_key"
+    )
+    if run.status == 'completed': 
+        messages = client.beta.threads.messages.list(
+            thread_id=thread.id
+        )
+        res = []
+        flag = -1
+        for i in messages.data[0].content[0].text.value.split("\n"):
+            if i: 
+                if i[0] in '12345':
+                    print(i)
+                    res.append(i)
+                    flag = 2
+                    
+                elif flag <= 2 and flag >= 0:
+                    flag -= 1
+                    res.append(i)
+                    
+        return res[:-1]
+                
+    else:
+        return run.status
